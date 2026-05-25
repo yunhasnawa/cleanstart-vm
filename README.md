@@ -158,7 +158,7 @@ cleanstart-vm/
 
 ## 📄 License
 
-MIT License — feel free to use, modify, and distribute.
+GNU General Public License v3.0 — you are free to use, modify, and distribute this software, but any distributed version (including modifications) must also be released under the same GPL v3 license with source code made available.
 
 ---
 
