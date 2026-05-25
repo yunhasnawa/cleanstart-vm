@@ -23,17 +23,18 @@ cmd_create_service() {
     exit 1
   fi
 
-  # Pastikan VM-nya ada
-  if ! VBoxManage list vms | grep -q "\"$vm\""; then
-    echo "Error: VM '$vm' tidak ditemukan."
+  # Tentukan user nyata di balik sudo — harus dilakukan sebelum memanggil
+  # VBoxManage, karena registry VM bersifat per-user dan tidak terlihat oleh root
+  local real_user="${SUDO_USER:-$(logname 2>/dev/null || echo "$USER")}"
+
+  # Pastikan VM-nya ada (jalankan sebagai real_user, bukan root)
+  if ! sudo -u "$real_user" VBoxManage list vms | grep -q "\"$vm\""; then
+    echo "Error: VM '$vm' tidak ditemukan untuk user '$real_user'."
     echo ""
     echo "VM yang tersedia:"
-    VBoxManage list vms | sed 's/^/  /'
+    sudo -u "$real_user" VBoxManage list vms | sed 's/^/  /'
     exit 1
   fi
-
-  # Tentukan user nyata di balik sudo
-  local real_user="${SUDO_USER:-$(logname 2>/dev/null || echo "$USER")}"
   local service_file="/etc/systemd/system/${SERVICE_NAME}.service"
 
   # Tentukan path binary yang akan dipanggil service
