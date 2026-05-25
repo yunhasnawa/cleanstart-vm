@@ -44,8 +44,11 @@ cleanstart-vm "nama-vm"
 ### Examples
 
 ```bash
-# Start a single VM
+# Clean state and restart a VM
 cleanstart-vm "hadoop-namenode"
+
+# Clean state without restarting
+cleanstart-vm "hadoop-namenode" --no-start
 
 # Start multiple VMs one by one
 cleanstart-vm "datanode-1"
@@ -56,6 +59,30 @@ cleanstart-vm "datanode-3"
 ---
 
 ## 🔧 Auto-start on Boot (Systemd Service)
+
+There are two ways to set up a VM to auto-start on boot:
+
+### Option 1 — During installation (via `install.sh`)
+
+Pass the VM name when running the installer:
+
+```bash
+curl -sSL https://raw.githubusercontent.com/yunhasnawa/cleanstart-vm/main/install.sh | sudo bash -s -- "nama-vm"
+```
+
+### Option 2 — After installation (via `--create-service`)
+
+Once the script is installed, you can create the service at any time using:
+
+```bash
+sudo cleanstart-vm --create-service "nama-vm"
+```
+
+Replace `"nama-vm"` with the **exact name of your VirtualBox VM**.
+
+> **Tip:** To find your VM names, run `VBoxManage list vms`
+
+Both options produce the same systemd service. If you already have a service set up and want to point it to a different VM, simply run `--create-service` again with the new VM name.
 
 If you provided a VM name during installation, a systemd service is automatically created and enabled.
 

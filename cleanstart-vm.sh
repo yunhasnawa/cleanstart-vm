@@ -4,16 +4,107 @@
 # Membersihkan lock file, saved state, dan proses VirtualBox yang nyangkut,
 # lalu mencoba start ulang VM.
 #
-# Usage: ./cleanup-vm.sh <nama-vm> [--no-start]
+# Usage:
+#   ./cleanstart-vm.sh <nama-vm> [--no-start]
+#   ./cleanstart-vm.sh --create-service <nama-vm>
 
 set -euo pipefail
 
+SERVICE_NAME="cleanstart-vm"
+INSTALL_PATH="/usr/local/bin/cleanstart-vm"
+
+# ─── Fungsi: buat systemd service ────────────────────────────────────────────
+cmd_create_service() {
+  local vm="$1"
+
+  if [[ "$EUID" -ne 0 ]]; then
+    echo "Error: --create-service harus dijalankan dengan sudo."
+    echo "  Coba: sudo $0 --create-service \"$vm\""
+    exit 1
+  fi
+
+  # Pastikan VM-nya ada
+  if ! VBoxManage list vms | grep -q "\"$vm\""; then
+    echo "Error: VM '$vm' tidak ditemukan."
+    echo ""
+    echo "VM yang tersedia:"
+    VBoxManage list vms | sed 's/^/  /'
+    exit 1
+  fi
+
+  # Tentukan user nyata di balik sudo
+  local real_user="${SUDO_USER:-$(logname 2>/dev/null || echo "$USER")}"
+  local service_file="/etc/systemd/system/${SERVICE_NAME}.service"
+
+  # Tentukan path binary yang akan dipanggil service
+  local exec_path
+  if command -v cleanstart-vm &>/dev/null; then
+    exec_path="$(command -v cleanstart-vm)"
+  else
+    exec_path="$INSTALL_PATH"
+  fi
+
+  echo "═══════════════════════════════════════════════════════════════"
+  echo "  Membuat systemd service untuk VM: $vm"
+  echo "═══════════════════════════════════════════════════════════════"
+  echo ""
+
+  cat > "$service_file" <<EOF
+[Unit]
+Description=Auto-start VM '$vm' on boot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=$real_user
+ExecStart=$exec_path "$vm"
+RemainAfterExit=yes
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+  systemctl daemon-reload
+  systemctl enable "${SERVICE_NAME}.service"
+
+  echo "✓ Service '$SERVICE_NAME' berhasil dibuat dan diaktifkan."
+  echo ""
+  echo "  VM '$vm' akan otomatis menyala setiap kali komputer boot."
+  echo ""
+  echo "  Perintah berguna:"
+  echo "    sudo systemctl status $SERVICE_NAME"
+  echo "    sudo systemctl start  $SERVICE_NAME"
+  echo "    sudo systemctl stop   $SERVICE_NAME"
+  echo "    sudo systemctl disable $SERVICE_NAME"
+  echo "    sudo journalctl -u $SERVICE_NAME -f"
+  exit 0
+}
+
 # ─── Input & validasi ────────────────────────────────────────────────────────
-VM_NAME="${1:-}"
-NO_START="${2:-}"
+ARG1="${1:-}"
+ARG2="${2:-}"
+
+if [[ "$ARG1" == "--create-service" ]]; then
+  if [[ -z "$ARG2" ]]; then
+    echo "Usage: $0 --create-service <nama-vm>"
+    echo ""
+    echo "VM yang tersedia:"
+    VBoxManage list vms | sed 's/^/  /'
+    exit 1
+  fi
+  cmd_create_service "$ARG2"
+fi
+
+VM_NAME="$ARG1"
+NO_START="$ARG2"
 
 if [[ -z "$VM_NAME" ]]; then
-  echo "Usage: $0 <nama-vm> [--no-start]"
+  echo "Usage:"
+  echo "  $0 <nama-vm> [--no-start]"
+  echo "  $0 --create-service <nama-vm>"
   echo ""
   echo "VM yang tersedia:"
   VBoxManage list vms | sed 's/^/  /'
